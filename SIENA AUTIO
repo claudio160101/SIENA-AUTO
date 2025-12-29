@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Siena Auto</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{margin:0;font-family:Arial;background:#f5f5f5}
+
+/* HEADER */
+header{
+  background:#000;
+  color:#fff;
+  padding:15px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+/* MENU */
+nav{
+  background:#111;
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:10px;
+}
+nav button{
+  background:none;
+  border:1px solid #fff;
+  color:#fff;
+  padding:10px 16px;
+  cursor:pointer;
+}
+nav button.active,nav button:hover{
+  background:#fff;
+  color:#000;
+}
+
+/* BANNER */
+.banner{height:260px;position:relative}
+.banner img{width:100%;height:100%;object-fit:cover}
+.banner::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.35);
+}
+
+/* PAGINE */
+.page{
+  opacity:0;
+  transform:translateY(20px);
+  pointer-events:none;
+  position:absolute;
+  width:100%;
+  left:0;
+  transition:.4s;
+  padding:30px;
+}
+.page.active{
+  opacity:1;
+  transform:translateY(0);
+  pointer-events:auto;
+  position:relative;
+}
+
+/* GRIGLIA */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:20px;
+}
+
+/* CARD */
+.car{
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 4px 10px rgba(0,0,0,.15);
+  padding:15px;
+}
+.car img{
+  width:100%;
+  height:160px;
+  object-fit:cover;
+  border-radius:8px;
+}
+.price{font-weight:bold;margin-top:10px}
+.car button{
+  width:100%;
+  margin-top:6px;
+  padding:6px;
+}
+
+/* ADMIN */
+#admin{
+  display:none;
+  background:#fff;
+  padding:20px;
+  margin:20px;
+  border-radius:10px;
+}
+#admin input,#admin textarea,#admin select{
+  width:100%;
+  padding:8px;
+  margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>SIENA AUTO</h1>
+  <span>Ciro Marina (KR)</span>
+</header>
+
+<nav>
+  <button class="active" onclick="showPage('vendita',this)">Vendita Auto</button>
+  <button onclick="showPage('noleggio',this)">Noleggio</button>
+  <button onclick="showPage('furgoni',this)">Furgoni</button>
+  <button onclick="showPage('navetta',this)">Navetta</button>
+  <button onclick="showPage('info',this)">Info</button>
+</nav>
+
+<div class="banner">
+  <img src="banner.jpg">
+</div>
+
+<!-- ADMIN -->
+<div id="admin">
+  <h2>AREA ADMIN</h2>
+  <input id="name" placeholder="Nome veicolo">
+  <select id="category">
+    <option value="">Categoria</option>
+    <option value="vendita">Vendita</option>
+    <option value="noleggio">Noleggio</option>
+    <option value="furgoni">Furgoni</option>
+    <option value="navetta">Navetta</option>
+  </select>
+  <textarea id="desc" placeholder="Descrizione"></textarea>
+  <input id="price" placeholder="Prezzo">
+  <input type="file" id="image" accept="image/*">
+  <button onclick="saveCar()">SALVA</button>
+</div>
+
+<!-- PAGINE -->
+<div id="vendita" class="page active"><h2>Vendita Auto</h2><div class="grid"></div></div>
+<div id="noleggio" class="page"><h2>Noleggio</h2><div class="grid"></div></div>
+<div id="furgoni" class="page"><h2>Furgoni</h2><div class="grid"></div></div>
+<div id="navetta" class="page"><h2>Navetta</h2><div class="grid"></div></div>
+
+<div id="info" class="page">
+  <h2>Info</h2>
+  <p>Vendita, noleggio e servizi.</p>
+</div>
+
+<script>
+const admin = document.getElementById("admin");
+const nameI = document.getElementById("name");
+const catI = document.getElementById("category");
+const descI = document.getElementById("desc");
+const priceI = document.getElementById("price");
+const imageI = document.getElementById("image");
+
+let cars = JSON.parse(localStorage.getItem("cars") || "[]");
+let img64 = "";
+let editIndex = null;
+
+/* ACCESSO ADMIN */
+document.addEventListener("keydown",e=>{
+  if(e.ctrlKey && e.key==="a"){
+    if(prompt("Password admin")==="admin"){
+      admin.style.display="block";
+      render();
+    }
+  }
+});
+
+/* IMAGE – COMPRESSA (ANTI QUOTA) */
+imageI.onchange = () => {
+  const file = imageI.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxW = 800;
+      const scale = Math.min(1, maxW / img.width);
+
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      img64 = canvas.toDataURL("image/jpeg", 0.6);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+/* NAV */
+function showPage(id,btn){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  btn.classList.add("active");
+}
+
+/* SAVE */
+function saveCar(){
+  if(!nameI.value || !catI.value){
+    alert("Nome e categoria obbligatori");
+    return;
+  }
+
+  const car={
+    name:nameI.value,
+    cat:catI.value,
+    desc:descI.value,
+    price:priceI.value,
+    img:img64
+  };
+
+  if(editIndex!==null){
+    cars[editIndex]=car;
+    editIndex=null;
+  }else{
+    cars.push(car);
+  }
+
+  localStorage.setItem("cars",JSON.stringify(cars));
+  clearForm();
+  render();
+}
+
+/* EDIT */
+function editCar(i){
+  const c=cars[i];
+  nameI.value=c.name;
+  catI.value=c.cat;
+  descI.value=c.desc;
+  priceI.value=c.price;
+  img64=c.img;
+  editIndex=i;
+  admin.style.display="block";
+}
+
+/* DELETE */
+function deleteCar(i){
+  if(confirm("Eliminare veicolo?")){
+    cars.splice(i,1);
+    localStorage.setItem("cars",JSON.stringify(cars));
+    render();
+  }
+}
+
+/* CLEAR */
+function clearForm(){
+  nameI.value="";
+  catI.value="";
+  descI.value="";
+  priceI.value="";
+  imageI.value="";
+  img64="";
+}
+
+/* RENDER */
+function render(){
+  document.querySelectorAll(".grid").forEach(g=>g.innerHTML="");
+
+  cars.forEach((c,i)=>{
+    const g=document.querySelector("#"+c.cat+" .grid");
+    if(!g) return;
+
+    g.innerHTML+=`
+      <div class="car">
+        ${c.img?`<img src="${c.img}">`:""}
+        <h3>${c.name}</h3>
+        <p>${c.desc}</p>
+        ${c.price?`<div class="price">${c.price}</div>`:""}
+        ${admin.style.display==="block"?`
+          <button onclick="editCar(${i})">Modifica</button>
+          <button onclick="deleteCar(${i})">Elimina</button>`:""}
+      </div>`;
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
